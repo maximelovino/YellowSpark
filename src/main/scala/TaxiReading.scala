@@ -11,6 +11,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 
 object TaxiReading extends App {
+  val MILES_TO_KM = 1.60934
 
   val spark = SparkSession.builder()
     .appName("Spark Taxi example")
@@ -37,6 +38,7 @@ object TaxiReading extends App {
     .withColumn("tip_amount", col("tip_amount").cast(DoubleType))
     .withColumn("tolls_amount", col("tolls_amount").cast(DoubleType))
     .withColumn("total_amount", col("total_amount").cast(DoubleType))
+    .withColumn("taxi_revenue", col("tip_amount") + col("fare_amount"))
 
 
   val tripsDf = rawTripsDf
@@ -46,6 +48,8 @@ object TaxiReading extends App {
     .withColumn("passenger_count", col("passenger_count").cast(IntegerType))
     .withColumn("trip_time_in_secs", col("trip_time_in_secs").cast(IntegerType))
     .withColumn("trip_distance", col("trip_distance").cast(DoubleType))
+    .withColumn("trip_distance_km", col("trip_distance") * MILES_TO_KM)
+    .withColumn("average_speed_kmh", (col("trip_distance_km") / col("trip_time_in_secs")) * 3600)
     .withColumn("pickup_longitude", col("pickup_longitude").cast(DoubleType))
     .withColumn("pickup_latitude", col("pickup_latitude").cast(DoubleType))
     .withColumn("dropoff_longitude", col("dropoff_longitude").cast(DoubleType))
@@ -57,23 +61,41 @@ object TaxiReading extends App {
   println("=========")
   faresDf.show(2)
 
-  //TODO think about fill null data if there is any
-
 
   val df = tripsDf.join(faresDf, Seq("medallion", "hack_license", "pickup_datetime"), "inner")
 
-  df.printSchema()
 
-  val groupByLicense = df.groupBy("hack_license").count()
+  val finalDf = df.filter(col("rate_code") !== 5)
+    .filter(col("trip_time_in_secs") > 1)
+    .filter(col("trip_distance") > 0.0)
+    .filter(col("pickup_longitude") < -70.0 && col("pickup_longitude") > -75.0)
+    .filter(col("dropoff_longitude") < -70.0 && col("dropoff_longitude") > -75.0)
+    .filter(col("pickup_latitude") > 40.0 && col("pickup_latitude") < 42.0)
+    .filter(col("dropoff_latitude") > 40.0 && col("dropoff_latitude") < 42.0)
+    .filter(col("average_speed_kmh") < 150)
+    .filter(col("trip_distance_km") >= 1)
+    .filter(col("trip_time_in_secs") >= 30)
 
 
-  val sumByLicense = df.groupBy("hack_license")
-    .sum("passenger_count", "trip_distance", "total_amount")
+  finalDf.cache()
+
+  finalDf.orderBy("trip_time_in_secs").limit(20).show(truncate = false)
+
+  val groupByLicense = finalDf.groupBy("hack_license").count()
+  val avgByLicense = finalDf.groupBy("hack_license").avg("average_speed_kmh")
+    .withColumnRenamed("avg(average_speed_kmh)", "Average speed in km/h")
+
+
+  val sumByLicense = finalDf.groupBy("hack_license")
+    .sum("passenger_count", "trip_distance_km", "taxi_revenue", "tip_amount", "fare_amount", "trip_time_in_secs")
     .withColumnRenamed("sum(passenger_count)", "total_passengers")
-    .withColumnRenamed("sum(trip_distance)", "total_distance")
-    .withColumnRenamed("sum(total_amount)", "$$$$$")
+    .withColumnRenamed("sum(trip_distance_km)", "total_distance_km")
+    .withColumnRenamed("sum(taxi_revenue)", "$$$$$")
+    .withColumnRenamed("sum(tip_amount)", "TIPS")
+    .withColumnRenamed("sum(fare_amount)", "FARES")
+    .withColumnRenamed("sum(trip_time_in_secs)", "DURATION")
 
-  val aggByLicense = groupByLicense.join(sumByLicense, "hack_license").orderBy(desc("total_distance"))
+  val aggByLicense = groupByLicense.join(sumByLicense, "hack_license").join(avgByLicense, "hack_license").orderBy(desc("$$$$$"))
 
   aggByLicense.show(20, truncate = false)
 
