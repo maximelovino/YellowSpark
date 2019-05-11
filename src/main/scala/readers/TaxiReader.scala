@@ -78,6 +78,10 @@ object TaxiReader {
       .withColumn("dropoff_latitude", $"dropoff_latitude".cast(DoubleType))
       .withColumn("pickup_borough", boroughUDF($"pickup_longitude", $"pickup_latitude"))
       .withColumn("dropoff_borough", boroughUDF($"dropoff_longitude", $"dropoff_latitude"))
+      .drop("vendor_id")
+
+    faresDf.printSchema()
+    tripsDf.printSchema()
 
     val df = tripsDf.join(faresDf, Seq("medallion", "hack_license", "pickup_datetime"), "inner")
 
