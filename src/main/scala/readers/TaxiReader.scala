@@ -87,8 +87,6 @@ object TaxiReader {
 
     if (clean) {
       val finalDf = df.filter($"rate_code" !== 5)
-        .filter($"trip_time_in_secs" > 1)
-        .filter($"trip_distance" > 0.0)
         .filter($"average_speed_kmh" < 150)
         .filter($"trip_distance_km" >= 1)
         .filter($"trip_time_in_secs" >= 30)
