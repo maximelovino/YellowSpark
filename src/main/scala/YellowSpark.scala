@@ -33,10 +33,10 @@ object YellowSpark extends App {
 
   println(s"Number of rides total: ${finalDf.count()}")
 
-  analytics.displayRateCodeStats(finalDf)
+  analytics.statsByRateCode(finalDf).show()
 
-  analytics.displayTipStatsByBorough(finalDf)
+  analytics.statsByBoroughPairs(finalDf).show(100)
 
-  analytics.topDrivers(finalDf)
+  analytics.topDrivers(finalDf).show(20)
 
 }
