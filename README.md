@@ -73,7 +73,6 @@ root
  |-- tip_amount: double (nullable = true)
  |-- tolls_amount: double (nullable = true)
  |-- total_amount: double (nullable = true)
- |-- taxi_revenue: double (nullable = true)
 ```
 
 At the moment, in order to avoid overloading our computers while still exploring and analysing the dataset, we have only worked on the January data and haven't opened the other file.
@@ -88,6 +87,38 @@ Then, we used the boroughs boundaries we had at our disposal and the pickup/drop
 
 Finally, for the fares part, we added `taxi_revenue` which is the sum of the fare and the tip for a ride and as such it computes the amount that goes in the driver's pocket for the ride.
 
+The final structure is the following:
+
+```
+root
+ |-- medallion: string (nullable = true)
+ |-- hack_license: string (nullable = true)
+ |-- pickup_datetime: timestamp (nullable = true)
+ |-- rate_code: integer (nullable = true)
+ |-- store_and_fwd_flag: string (nullable = true)
+ |-- dropoff_datetime: timestamp (nullable = true)
+ |-- passenger_count: integer (nullable = true)
+ |-- trip_time_in_secs: integer (nullable = true)
+ |-- trip_distance: double (nullable = true)
+ |-- pickup_longitude: double (nullable = true)
+ |-- pickup_latitude: double (nullable = true)
+ |-- dropoff_longitude: double (nullable = true)
+ |-- dropoff_latitude: double (nullable = true)
+ |-- trip_distance_km: double (nullable = true)
+ |-- average_speed_kmh: double (nullable = true)
+ |-- pickup_borough: string (nullable = true)
+ |-- dropoff_borough: string (nullable = true)
+ |-- vendor_id: string (nullable = true)
+ |-- payment_type: string (nullable = true)
+ |-- fare_amount: double (nullable = true)
+ |-- surcharge: double (nullable = true)
+ |-- mta_tax: double (nullable = true)
+ |-- tip_amount: double (nullable = true)
+ |-- tolls_amount: double (nullable = true)
+ |-- total_amount: double (nullable = true)
+ |-- taxi_revenue: double (nullable = true)
+```
+
 ### Data cleaning
 
 First of all, we decided to drop any ride using the rate code #05, because as stated [here](https://www1.nyc.gov/site/tlc/passengers/taxi-fare.page) and as seen in our dataset, the rides with rate code #05 are _Out of City Negotiated Flat Rate_ and in the dataset do not contain any information about duration, distance or locations, so we can't do anything with these rides.
@@ -95,6 +126,8 @@ First of all, we decided to drop any ride using the rate code #05, because as st
 Then, we noticed many "failed" rides with duration smaller or equal to 1 second, distance of 0.0 km, etc. We filtered out rides with duration smaller than 30 seconds, rides with distance smaller than 1km and finally we used the average speed we computed to filter out any ride with an average speed of more than 150 km/h (we could actually go further down with this limit).
 
 There were also some failed coordinates for rides and we decided to remove them as well, basically we used the pickup and dropoff boroughs and filtered out all rides which had both started and ended outside of any borough boundaries.
+
+For the month of January, applying this filtering has reduced the dataset from 14'776'615 rides to 13'073'111 rides, so we removed 11% of the rides.
 
 ## Analysis questions
 
