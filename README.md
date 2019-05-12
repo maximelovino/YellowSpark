@@ -134,7 +134,7 @@ For the month of January, applying this filtering has reduced the dataset from 1
 - Trying to find a linear regression to estimate the fare amount of a ride (for each rate code) based on the distance and duration
 - Analysis of the tips by pairs of boroughs (pickup-dropoff)
 - Analysis of the average time to find the next ride based on the borough where the last ride finished (based on the given PDF)
-- Building a machine learning to estimate traffic congestion based on the borough and time of day. The estimation of the congestion will be based on the average speed of the rides. We will evaluate our model by predicting speeds for test rides.
+- Building a machine learning model to estimate traffic congestion based on the borough and time of day. The estimation of the congestion will be based on the average speed of the rides. We will evaluate our model by predicting speeds for test rides.
 - Other global simple analysis:
   - Richest taxi driver
   - Most efficient taxi driver (most revenue/second ratio)
