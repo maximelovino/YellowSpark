@@ -88,9 +88,7 @@ object TaxiReader {
     if (clean) {
       val finalDf = df.filter($"rate_code" !== 5)
         .filter($"average_speed_kmh" < 150)
-        .filter($"trip_distance_km" >= 1)
-        .filter($"trip_time_in_secs" >= 30)
-        .filter("pickup_borough <> 'NA' AND dropoff_borough <> 'NA'")
+        .filter("pickup_borough <> 'NA' AND dropoff_borough <> 'NA'") //This removes all rides starting OR finishing outside NYC
 
       finalDf.cache()
       finalDf

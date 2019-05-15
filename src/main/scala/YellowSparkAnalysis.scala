@@ -6,7 +6,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
   * @project YellowSpark
   */
 
-object SavedSpark extends App {
+object YellowSparkAnalysis extends App {
   val spark = SparkSession.builder()
     .appName("Spark Taxi saved")
     .master("local[*]")

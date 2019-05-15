@@ -123,11 +123,13 @@ root
 
 First of all, we decided to drop any ride using the rate code #05, because as stated [here](https://www1.nyc.gov/site/tlc/passengers/taxi-fare.page) and as seen in our dataset, the rides with rate code #05 are _Out of City Negotiated Flat Rate_ and in the dataset do not contain any information about duration, distance or locations, so we can't do anything with these rides.
 
-Then, we noticed many "failed" rides with duration smaller or equal to 1 second, distance of 0.0 km, etc. We filtered out rides with duration smaller than 30 seconds, rides with distance smaller than 1km and finally we used the average speed we computed to filter out any ride with an average speed of more than 150 km/h (we could actually go further down with this limit).
+Then, we noticed many "failed" rides with duration smaller or equal to 1 second, distance of 0.0 km, etc. We used the average speed we computed to filter out any ride with an average speed of more than 150 km/h (we could actually go further down with this limit).
 
-There were also some failed coordinates for rides and we decided to remove them as well, basically we used the pickup and dropoff boroughs and filtered out all rides which had both started and ended outside of any borough boundaries.
+There were also some failed coordinates for rides and we decided to remove them as well, basically we used the pickup and dropoff boroughs and filtered out all rides which had started or ended outside of any borough boundaries.
 
-For the month of January, applying this filtering has reduced the dataset from 14'776'615 rides to 13'073'111 rides, so we removed 11% of the rides.
+For the month of January, applying this filtering has reduced the dataset from 14'776'615 rides to 14'390'215 rides, so we removed 2.6% of the rides.
+
+The set of filters used to clean the data is not fully decided yet and may change in the future.
 
 ## Analysis questions
 
