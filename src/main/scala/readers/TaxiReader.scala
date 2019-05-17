@@ -16,6 +16,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 
 object TaxiReader {
   private val MILES_TO_KM = 1.60934
+  private val GPS_MARGIN = 0.5
 
   def parseTaxiData(spark: SparkSession, boroughs: IndexedSeq[Feature], clean: Boolean = true): DataFrame = {
     import spark.implicits._
@@ -36,6 +37,21 @@ object TaxiReader {
       }
     }
     val boroughUDF = udf(bLookup)
+
+
+    def greatCircleDistance = (lat1: Double, lon1: Double, lat2: Double, lon2: Double) => { // generally used geo measurement function
+      val R = 6378.137
+      val dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180
+      val dLon = lon2 * Math.PI / 180 - lon1 * Math.PI / 180
+      val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2)
+      val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      R * c
+    }
+
+
+    val greatCircleDistanceUDF = udf(greatCircleDistance)
 
 
     val speedKmh = (distance: Double, time: Double) => (distance / time) * 3600
@@ -78,6 +94,7 @@ object TaxiReader {
       .withColumn("dropoff_latitude", $"dropoff_latitude".cast(DoubleType))
       .withColumn("pickup_borough", boroughUDF($"pickup_longitude", $"pickup_latitude"))
       .withColumn("dropoff_borough", boroughUDF($"dropoff_longitude", $"dropoff_latitude"))
+      .withColumn("great_circle_distance_km", greatCircleDistanceUDF($"pickup_latitude", $"pickup_longitude", $"dropoff_latitude", $"dropoff_longitude"))
       .drop("vendor_id")
 
     faresDf.printSchema()
@@ -87,8 +104,10 @@ object TaxiReader {
 
     if (clean) {
       val finalDf = df.filter($"rate_code" !== 5)
-        .filter($"average_speed_kmh" < 150)
+        .filter($"average_speed_kmh" < 120)
         .filter("pickup_borough <> 'NA' AND dropoff_borough <> 'NA'") //This removes all rides starting OR finishing outside NYC
+        .where(s"(rate_code = 1 AND great_circle_distance_km < (trip_distance_km + $GPS_MARGIN)) OR rate_code <>1")
+        .where("passenger_count > 0")
 
       finalDf.cache()
       finalDf
