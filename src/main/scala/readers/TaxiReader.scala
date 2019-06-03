@@ -61,8 +61,8 @@ object TaxiReader {
     val milesConversionUdf = udf(milesConversion)
 
 
-    val rawTripsDf = spark.read.format("csv").option("header", "true").load("./src/main/resources/trip.csv")
-    val rawFaresDf = spark.read.format("csv").option("header", "true").load("./src/main/resources/fare.csv")
+    val rawTripsDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us/trip_data_*.csv")
+    val rawFaresDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us/trip_fare_*.csv")
 
 
     val cleanedUpDf = trimmedDataFrame(rawFaresDf) // The fares CSV contains spaces in headers so we have to trim the column names

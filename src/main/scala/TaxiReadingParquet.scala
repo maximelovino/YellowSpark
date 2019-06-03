@@ -1,5 +1,4 @@
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 import readers.{GeoReader, TaxiReader}
 
 
@@ -11,15 +10,16 @@ import readers.{GeoReader, TaxiReader}
   */
 
 
-object TaxiReadingParquet extends App {
-  val spark = SparkSession.builder()
-    .appName("Spark Taxi example")
-    .master("local[*]")
-    .getOrCreate()
+object TaxiReadingParquet {
+  def main(args: Array[String]): Unit = {
+    val spark = SparkSession.builder()
+      .appName("Spark Taxi example")
+      .getOrCreate()
 
-  val boroughs = GeoReader.parseBoroughs()
-  val finalDf = TaxiReader.parseTaxiData(spark, boroughs)
+    val boroughs = GeoReader.parseBoroughs()
+    val finalDf = TaxiReader.parseTaxiData(spark, boroughs)
 
-  finalDf.printSchema()
-  finalDf.write.parquet("./src/main/resources/rides.df")
+    finalDf.printSchema()
+    finalDf.write.parquet("s3a://yellowspark-us/rides.df")
+  }
 }

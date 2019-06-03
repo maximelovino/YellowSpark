@@ -13,7 +13,9 @@ import spray.json._
 object GeoReader {
 
   def parseBoroughs(): IndexedSeq[Feature] = {
-    val geojson = scala.io.Source.fromResource("nyc-boroughs.geojson").mkString
+    val geojsonSource = scala.io.Source.fromURL("https://yellowspark-us.s3.amazonaws.com/nyc-boroughs.geojson")
+    val geojson = geojsonSource.mkString
+    geojsonSource.close()
     val features = geojson.parseJson.convertTo[FeatureCollection]
 
     features.sortBy(f => {

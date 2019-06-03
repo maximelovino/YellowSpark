@@ -1,4 +1,8 @@
-import org.apache.spark.sql.{SaveMode, SparkSession}
+import java.sql.Timestamp
+
+import org.apache.spark.sql.functions.{avg, desc, stddev}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
+
 /**
   * @author Maxime Lovino
   * @date 2019-05-11
@@ -9,35 +13,143 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 object YellowSparkAnalysis extends App {
   val spark = SparkSession.builder()
     .appName("Spark Taxi saved")
-    .master("local[*]")
     .getOrCreate()
 
-  val df = spark.read.parquet("./src/main/resources/rides.df")
+  import spark.implicits._
+
+  def statsByRateCode(df: DataFrame): DataFrame = {
+    df.groupBy($"rate_code").count()
+  }
+
+  def statsByPickupBorough(df: DataFrame): DataFrame = {
+    val avg = df.groupBy($"pickup_borough").avg("tip_amount", "trip_time_in_secs", "trip_distance_km", "taxi_revenue")
+      .withColumnRenamed("avg(tip_amount)", "avg_tip_amount")
+      .withColumnRenamed("avg(trip_time_in_secs)", "avg_trip_time_in_secs")
+      .withColumnRenamed("avg(trip_distance_km)", "avg_trip_distance_km")
+      .withColumnRenamed("avg(taxi_revenue)", "avg_taxi_revenue")
+    val sum = df.groupBy($"pickup_borough").sum("trip_time_in_secs", "trip_distance_km", "taxi_revenue")
+      .withColumnRenamed("sum(trip_time_in_secs)", "sum_trip_time_in_secs")
+      .withColumnRenamed("sum(trip_distance_km)", "sum_trip_distance_km")
+      .withColumnRenamed("sum(taxi_revenue)", "sum_taxi_revenue")
+    val count = df.groupBy($"pickup_borough").count()
+    avg.join(count, Seq("pickup_borough")).join(sum, Seq("pickup_borough"))
+      .orderBy("pickup_borough")
+  }
+
+  def statsByDropoffBorough(df: DataFrame): DataFrame = {
+    val avg = df.groupBy($"dropoff_borough").avg("tip_amount", "trip_time_in_secs", "trip_distance_km", "taxi_revenue")
+      .withColumnRenamed("avg(tip_amount)", "avg_tip_amount")
+      .withColumnRenamed("avg(trip_time_in_secs)", "avg_trip_time_in_secs")
+      .withColumnRenamed("avg(trip_distance_km)", "avg_trip_distance_km")
+      .withColumnRenamed("avg(taxi_revenue)", "avg_taxi_revenue")
+    val sum = df.groupBy($"dropoff_borough").sum("trip_time_in_secs", "trip_distance_km", "taxi_revenue")
+      .withColumnRenamed("sum(trip_time_in_secs)", "sum_trip_time_in_secs")
+      .withColumnRenamed("sum(trip_distance_km)", "sum_trip_distance_km")
+      .withColumnRenamed("sum(taxi_revenue)", "sum_taxi_revenue")
+    val count = df.groupBy($"dropoff_borough").count()
+    avg.join(count, Seq("dropoff_borough")).join(sum, Seq("dropoff_borough"))
+      .orderBy("dropoff_borough")
+  }
+
+  def statsByBoroughPairs(df: DataFrame): DataFrame = {
+    val avg = df.groupBy($"pickup_borough", $"dropoff_borough").avg("tip_amount", "trip_time_in_secs", "trip_distance_km", "taxi_revenue")
+      .withColumnRenamed("avg(tip_amount)", "avg_tip_amount")
+      .withColumnRenamed("avg(trip_time_in_secs)", "avg_trip_time_in_secs")
+      .withColumnRenamed("avg(trip_distance_km)", "avg_trip_distance_km")
+      .withColumnRenamed("avg(taxi_revenue)", "avg_taxi_revenue")
+    val sum = df.groupBy($"pickup_borough", $"dropoff_borough").sum("trip_time_in_secs", "trip_distance_km", "taxi_revenue")
+      .withColumnRenamed("sum(trip_time_in_secs)", "sum_trip_time_in_secs")
+      .withColumnRenamed("sum(trip_distance_km)", "sum_trip_distance_km")
+      .withColumnRenamed("sum(taxi_revenue)", "sum_taxi_revenue")
+    val count = df.groupBy($"pickup_borough", $"dropoff_borough").count()
+    avg.join(count, Seq("pickup_borough", "dropoff_borough")).join(sum, Seq("pickup_borough", "dropoff_borough"))
+      .orderBy("pickup_borough", "dropoff_borough")
+  }
+
+
+  def topDrivers(df: DataFrame, count: Int = 20): DataFrame = {
+    val groupByLicense = df.groupBy("hack_license").count()
+    val avgByLicense = df.groupBy("hack_license").avg("average_speed_kmh")
+      .withColumnRenamed("avg(average_speed_kmh)", "global_average_speed_kmh")
+
+
+    val sumByLicense = df.groupBy("hack_license")
+      .sum("passenger_count", "trip_distance_km", "taxi_revenue", "tip_amount", "fare_amount", "trip_time_in_secs")
+      .withColumnRenamed("sum(passenger_count)", "total_passengers")
+      .withColumnRenamed("sum(trip_distance_km)", "total_distance_km")
+      .withColumnRenamed("sum(taxi_revenue)", "total_revenue")
+      .withColumnRenamed("sum(tip_amount)", "total_tips")
+      .withColumnRenamed("sum(fare_amount)", "total_fares")
+      .withColumnRenamed("sum(trip_time_in_secs)", "total_duration")
+
+    groupByLicense
+      .join(sumByLicense, "hack_license")
+      .join(avgByLicense, "hack_license")
+      .orderBy(desc("total_revenue"))
+  }
+
+  def sessionise(df: DataFrame): DataFrame = {
+    df.repartition($"hack_license")
+      .sortWithinPartitions($"hack_license", $"pickup_datetime")
+  }
+
+  private def waitingTime(r1: Row, r2: Row) = {
+    (r2.getAs[Timestamp]("pickup_datetime").getTime - r1.getAs[Timestamp]("dropoff_datetime").getTime) / 1000
+  }
+
+
+  private def mapBoroughs(trips: Iterator[Row]) = {
+    val iter = trips.sliding(2)
+
+    val viter = iter
+      .filter(_.size == 2)
+      .filter(p => p.head.getAs("hack_license") == p.tail.head.getAs("hack_license"))
+
+    viter.map(p => (p.head.getAs[String]("dropoff_borough"), waitingTime(p.head, p.tail.head)))
+  }
+
+  def waitTimesByBorough(sessonisedDf: DataFrame): DataFrame = {
+    val boroughDurations: DataFrame = sessonisedDf.mapPartitions(mapBoroughs).toDF("dropoff_borough", "wait_seconds")
+
+    boroughDurations.
+      where("wait_seconds > 0 AND wait_seconds < 60*60*4")
+      .groupBy("dropoff_borough")
+      .agg(avg("wait_seconds"), stddev("wait_seconds"))
+      .withColumnRenamed("avg(wait_seconds)", "average_wait")
+      .withColumnRenamed("stddev_samp(wait_seconds)", "stdDev_wait")
+  }
+
+  val df = spark.read.parquet("s3a://yellowspark-us/rides.df")
 
   df.printSchema()
 
-  val analytics = new TaxiAnalytics(spark)
-
-  analytics.displayBoroughStats(df)
-
   println(s"Number of rides total: ${df.count()}")
 
-  analytics.statsByRateCode(df).show()
+  val rateCodeStats = statsByRateCode(df)
+  rateCodeStats.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/rateCodes.df")
+  rateCodeStats.show()
 
-  analytics.statsByBoroughPairs(df).show(100)
+  val pickupStats = statsByPickupBorough(df)
+  pickupStats.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/pickups.df")
+  pickupStats.show(100)
 
-  analytics.topDrivers(df).show(20)
+  val dropoffStats = statsByDropoffBorough(df)
+  dropoffStats.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/dropoffs.df")
+  dropoffStats.show(100)
+
+  val boroughPairs = statsByBoroughPairs(df)
+  boroughPairs.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/boroughPairs.df")
+  boroughPairs.show(100)
+
+  val topDriversDf = topDrivers(df)
+  topDriversDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/topDrivers.df")
+  topDriversDf.show(20)
 
 
-  val sessions = analytics.sessionise(df)
+  val sessions = sessionise(df)
 
-  sessions.cache()
-
-  val waitTimes = analytics.waitTimesByBorough(sessions)
-
-  waitTimes.write.mode(SaveMode.Overwrite).parquet("./src/main/resources/wait.df")
+  val waitTimes = waitTimesByBorough(sessions)
+  waitTimes.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/waitTimes.df")
 
   waitTimes.show(100, truncate = false)
-
-
 }
