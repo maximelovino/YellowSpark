@@ -39,7 +39,7 @@ object TaxiReader {
     val boroughUDF = udf(bLookup)
 
 
-    def greatCircleDistance = (lat1: Double, lon1: Double, lat2: Double, lon2: Double) => { // generally used geo measurement function
+    def greatCircleDistance = (lat1: Double, lon1: Double, lat2: Double, lon2: Double) => {
       val R = 6378.137
       val dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180
       val dLon = lon2 * Math.PI / 180 - lon1 * Math.PI / 180

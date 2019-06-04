@@ -75,9 +75,11 @@ root
  |-- total_amount: double (nullable = true)
 ```
 
-At the moment, in order to avoid overloading our computers while still exploring and analysing the dataset, we have only worked on the January data and haven't opened the other file.
+At first, in order to avoid overloading our computers while still exploring and analysing the dataset, we have only worked on the January data and haven't opened the other files.
 
-The January dataset contains 14'776'615 total rides before any cleaning or filtering, and weighs 2.46GB for the `trip_data` and 1.68GB for the `trip_fare`. We know that the files for the other months are more or less the same size or at least in the same order of magnitude so we should have more or less 150'000'000 total rides if we take into account the whole year.
+The January dataset contains 14'776'615 total rides before any cleaning or filtering, and weighs 2.46GB for the `trip_data` and 1.68GB for the `trip_fare`. 
+
+We then uploaded the 24 files in a AWS S3 bucket in order to run the processing on the whole year on AWS EC2. The total size of the whole uncompressed dataset was more or less 50GB.
 
 ## Features used and pre-processing
 
@@ -86,6 +88,8 @@ We added some calculated features to our dataset as well. First of all, we don't
 Then, we used the boroughs boundaries we had at our disposal and the pickup/dropoff longitude/latitude of the dataset to add `pickup_borough` and `dropoff_borough`. These two columns will also be used for filtering out bad data and one of our analysis.
 
 Finally, for the fares part, we added `taxi_revenue` which is the sum of the fare and the tip for a ride and as such it computes the amount that goes in the driver's pocket for the ride.
+
+Finally, we also added the `great_circle_distance_km` column that contains the [distance of the straight path](https://en.wikipedia.org/wiki/Great-circle_distance) between the pickup and dropoff locations. This will be used for filtering out bad data.
 
 The final structure is the following:
 
@@ -108,6 +112,7 @@ root
  |-- average_speed_kmh: double (nullable = true)
  |-- pickup_borough: string (nullable = true)
  |-- dropoff_borough: string (nullable = true)
+ |-- great_circle_distance_km: double (nullable = true)
  |-- vendor_id: string (nullable = true)
  |-- payment_type: string (nullable = true)
  |-- fare_amount: double (nullable = true)
@@ -123,20 +128,22 @@ root
 
 First of all, we decided to drop any ride using the rate code #05, because as stated [here](https://www1.nyc.gov/site/tlc/passengers/taxi-fare.page) and as seen in our dataset, the rides with rate code #05 are _Out of City Negotiated Flat Rate_ and in the dataset do not contain any information about duration, distance or locations, so we can't do anything with these rides.
 
-Then, we noticed many "failed" rides with duration smaller or equal to 1 second, distance of 0.0 km, etc. We used the average speed we computed to filter out any ride with an average speed of more than 150 km/h (we could actually go further down with this limit).
+Then, we noticed many "failed" rides with duration smaller or equal to 1 second, distance of 0.0 km, etc. We used the average speed we computed to filter out any ride with an average speed of more than 120 km/h (we could actually go further down with this limit).
 
 There were also some failed coordinates for rides and we decided to remove them as well, basically we used the pickup and dropoff boroughs and filtered out all rides which had started or ended outside of any borough boundaries.
 
-For the month of January, applying this filtering has reduced the dataset from 14'776'615 rides to 14'390'215 rides, so we removed 2.6% of the rides.
+We also removed any rides with 0 passengers.
 
-The set of filters used to clean the data is not fully decided yet and may change in the future.
+Finally, we used the `great_circle_distance_km` column we computed to remove all rate code #01 rides (most of the rides have rate code #01 and our trafic congestion model uses only those rides) to remove any  ride that had a distance smaller than the `great_circle_distance_km` with a margin of 0.5 km.
+
+In the end, our full year dataset with the data cleaning applied contains 165'652'077 rides.
 
 ## Analysis questions
 
-- Trying to find a linear regression to estimate the fare amount of a ride (for each rate code) based on the distance and duration
-- Analysis of the tips by pairs of boroughs (pickup-dropoff)
+- Trying to find a linear regression to estimate the fare amount of a ride (for each relevant rate code) based on the distance and duration
+- Analysis of the tips by pickup and dropoff boroughs and by pairs of boroughs (pickup-dropoff)
 - Analysis of the average time to find the next ride based on the borough where the last ride finished (based on the given PDF)
-- Building a machine learning model to estimate traffic congestion based on the borough and time of day. The estimation of the congestion will be based on the average speed of the rides. We will evaluate our model by predicting speeds for test rides.
+- Building a machine learning model to estimate traffic congestion based on the borough and time of day. The estimation of the congestion will be based on the average speed of the rides. We will evaluate our model by predicting average speeds for test rides.
 - Other global simple analysis:
   - Richest taxi driver
   - Most efficient taxi driver (most revenue/second ratio)
