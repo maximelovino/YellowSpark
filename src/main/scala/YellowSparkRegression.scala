@@ -18,7 +18,7 @@ object YellowSparkRegression extends App {
 
   import spark.implicits._
 
-  val df = spark.read.parquet("s3a://yellowspark-us/rides.df")
+  val df = spark.read.parquet("s3a://yellowspark-us-new/rides.df")
   df.printSchema()
 
   val preparedDF = df
@@ -35,11 +35,11 @@ object YellowSparkRegression extends App {
 
     val rateCodeSet = preparedDF.where(s"rate_code = $rateCode")
 
-    rateCodeSet.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us/rate_code_$rateCode.df")
+    rateCodeSet.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us-new/rate_code_$rateCode.df")
 
     val Array(train, test) = rateCodeSet.randomSplit(Array(0.7, 0.3))
-    train.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us/rate_code_train_$rateCode.df")
-    test.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us/rate_code_test_$rateCode.df")
+    train.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us-new/rate_code_train_$rateCode.df")
+    test.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us-new/rate_code_test_$rateCode.df")
     val formula = new RFormula().setFormula("cost ~ duration + distance")
 
     val reg = new LinearRegression()
@@ -56,7 +56,7 @@ object YellowSparkRegression extends App {
 
 
     val testPredict = fittedModel.transform(test)
-    testPredict.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us/predictions_$rateCode.df")
+    testPredict.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us-new/predictions_$rateCode.df")
     val mse = evaluator.evaluate(testPredict)
 
     testPredict.show(10, truncate = false)
@@ -65,7 +65,7 @@ object YellowSparkRegression extends App {
 
   models.foreach {
     case (rateCode, mse, fittedPipelineModel) => {
-      fittedPipelineModel.write.overwrite().save(s"s3a://yellowspark-us/model_regression_rate_code_$rateCode")
+      fittedPipelineModel.write.overwrite().save(s"s3a://yellowspark-us-new/model_regression_rate_code_$rateCode")
       println(s"Model for rate code $rateCode:")
       val fittedLr = fittedPipelineModel.stages.last.asInstanceOf[LinearRegressionModel]
       val coefficients = fittedLr.coefficients
@@ -84,5 +84,5 @@ object YellowSparkRegression extends App {
     }
   }.toSeq.toDF("rateCode", "mse", "formula", "intercept", "coeffs")
 
-  modelsDF.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us/linear_regression_models.df")
+  modelsDF.write.mode(SaveMode.Overwrite).parquet(s"s3a://yellowspark-us-new/linear_regression_models.df")
 }
