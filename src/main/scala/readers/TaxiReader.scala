@@ -61,8 +61,8 @@ object TaxiReader {
     val milesConversionUdf = udf(milesConversion)
 
 
-    val rawTripsDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us/trip_data_*.csv")
-    val rawFaresDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us/trip_fare_*.csv")
+    val rawTripsDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us-new/trip_data_*.csv")
+    val rawFaresDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us-new/trip_fare_*.csv")
 
 
     val cleanedUpDf = trimmedDataFrame(rawFaresDf) // The fares CSV contains spaces in headers so we have to trim the column names
@@ -108,6 +108,7 @@ object TaxiReader {
         .filter("pickup_borough <> 'NA' AND dropoff_borough <> 'NA'") //This removes all rides starting OR finishing outside NYC
         .where(s"(rate_code = 1 AND great_circle_distance_km < (trip_distance_km + $GPS_MARGIN)) OR rate_code <>1")
         .where("passenger_count > 0")
+        .filter("fare_amount > 0")
 
       finalDf.cache()
       finalDf

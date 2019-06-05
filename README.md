@@ -132,11 +132,11 @@ Then, we noticed many "failed" rides with duration smaller or equal to 1 second,
 
 There were also some failed coordinates for rides and we decided to remove them as well, basically we used the pickup and dropoff boroughs and filtered out all rides which had started or ended outside of any borough boundaries.
 
-We also removed any rides with 0 passengers.
+We also removed any rides with 0 passengers and rides with `fare_amount <= 0` because they make no sense.
 
 Finally, we used the `great_circle_distance_km` column we computed to remove all rate code #01 rides (most of the rides have rate code #01 and our trafic congestion model uses only those rides) to remove any  ride that had a distance smaller than the `great_circle_distance_km` with a margin of 0.5 km.
 
-In the end, our full year dataset with the data cleaning applied contains 165'652'077 rides.
+In the end, our full year dataset with the data cleaning applied contains 165'649'140 rides.
 
 ## Analysis questions
 
