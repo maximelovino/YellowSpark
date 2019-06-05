@@ -1,7 +1,7 @@
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.ml.feature._
-import org.apache.spark.ml.regression.{DecisionTreeRegressor, GBTRegressor, RandomForestRegressor}
+import org.apache.spark.ml.regression.GBTRegressor
 import org.apache.spark.ml.tuning.{CrossValidator, ParamGridBuilder}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -14,7 +14,6 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
   */
 
 
-//TODO this doesn't work well, built a classificator model with ranges for speed as classes
 object YellowSparkCongestion extends App {
   val spark = SparkSession.builder()
     .appName("Spark Taxi Congestion")
@@ -22,15 +21,17 @@ object YellowSparkCongestion extends App {
 
   import spark.implicits._
 
-  val df = spark.read.parquet("s3a://yellowspark-us/rides.df")
+  val df = spark.read.parquet("s3a://yellowspark-us-new/rides.df")
     .where("rate_code = 1")
     .where("average_speed_kmh >= 1 and average_speed_kmh < 70")
     .select("pickup_datetime", "dropoff_datetime", "trip_time_in_secs", "trip_distance_km", "average_speed_kmh", "pickup_borough", "dropoff_borough", "pickup_latitude", "pickup_longitude", "dropoff_latitude", "dropoff_longitude")
+    .withColumn("month", month($"pickup_datetime"))
     .withColumn("pickup_weekday", dayofweek($"pickup_datetime"))
     .withColumn("pickup_hour", hour($"pickup_datetime"))
     .withColumn("pickup_week_hour", $"pickup_weekday" * 24 + $"pickup_hour")
-    .drop("pickup_datetime", "dropoff_datetime")
-
+    .withColumn("speed_class", floor($"average_speed_kmh" / 10).as[Int])
+    .drop("pickup_datetime", "dropoff_datetime", "pickup_weekday", "dropoff_weekday", "pickup_hour", "dropoff_hour")
+    .filter("pickup_borough = 'Manhattan' and dropoff_borough = 'Manhattan'")
 
   val pickupMaxHour = df.agg(max("pickup_week_hour")).take(1).head.getInt(0)
 
@@ -38,73 +39,37 @@ object YellowSparkCongestion extends App {
     .withColumn("sin_pickup_hour_week", sin((lit(2 * Math.PI) * $"pickup_week_hour") / pickupMaxHour))
     .withColumn("cos_pickup_hour_week", cos((lit(2 * Math.PI) * $"pickup_week_hour") / pickupMaxHour))
 
+
+  newDf.printSchema()
+  println(newDf.count())
+
+  newDf.show(10)
+
   val Array(train, test) = newDf.randomSplit(Array(0.7, 0.3))
 
-
-  val rForm = new RFormula().setFormula("average_speed_kmh ~ cos_pickup_hour_week + sin_pickup_hour_week + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude")
-
-  val decisionTreeRegressor = new DecisionTreeRegressor().setLabelCol("label").setFeaturesCol("features")
-  val rfRegressor = new RandomForestRegressor().setLabelCol("label").setFeaturesCol("features")
-  //val gradientBoostedRegressor = new GBTRegressor().setLabelCol("label").setFeaturesCol("features")
-
-  val paramGrid = new ParamGridBuilder()
-    .addGrid(rForm.formula, Array(
-      "average_speed_kmh ~ pickup_week_hour + pickup_borough + dropoff_borough",
-      "average_speed_kmh ~ sin_pickup_hour_week + pickup_borough + dropoff_borough",
-      "average_speed_kmh ~ cos_pickup_hour_week + pickup_borough + dropoff_borough",
-      "average_speed_kmh ~ cos_pickup_hour_week:sin_pickup_hour_week + pickup_borough + dropoff_borough",
-      "average_speed_kmh ~ cos_pickup_hour_week + sin_pickup_hour_week + pickup_borough + dropoff_borough",
-      "average_speed_kmh ~ pickup_week_hour + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude",
-      "average_speed_kmh ~ sin_pickup_hour_week + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude",
-      "average_speed_kmh ~ cos_pickup_hour_week + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude",
-      "average_speed_kmh ~ cos_pickup_hour_week:sin_pickup_hour_week + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude",
-      "average_speed_kmh ~ cos_pickup_hour_week + sin_pickup_hour_week + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude"
-    )).build()
+  val rForm = new RFormula().setFormula("trip_time_in_secs ~ cos_pickup_hour_week + sin_pickup_hour_week + pickup_latitude + pickup_longitude + dropoff_latitude + dropoff_longitude + trip_distance_km")
 
 
-  val regressors = Array(("DecisionTree", decisionTreeRegressor), ("RandomForest", rfRegressor))
+  val regressor = new GBTRegressor().setLabelCol("label").setFeaturesCol("features")
 
 
-  val regressorsResult = regressors.map {
-    case (name, regressor) => {
-      println(s"Training $name")
-      val pipeline = new Pipeline()
-        .setStages(Array(rForm, regressor))
+  val pipeline = new Pipeline()
+    .setStages(Array(rForm, regressor))
 
-      val evaluator = new RegressionEvaluator()
-        .setLabelCol("label")
-        .setPredictionCol("prediction")
-        .setMetricName("mse")
+  val evaluator = new RegressionEvaluator()
+    .setLabelCol("label")
+    .setPredictionCol("prediction")
+    .setMetricName("mse")
 
-      /*val cv = new CrossValidator()
-        .setEstimator(pipeline)
-        .setEvaluator(evaluator)
-        .setEstimatorParamMaps(paramGrid)
-        .setNumFolds(5)
-        .setParallelism(8)*/
+  val fittedModel = pipeline.fit(train)
 
-      //val fittedModel = cv.fit(train)
-      val fittedModel = pipeline.fit(train)
+  val predictions = fittedModel.transform(test)
+  val predictionsSelected = predictions.select("prediction", "label")
+  predictionsSelected.show(10)
 
-      val predictions = fittedModel.transform(test)
-      predictions.show(10)
+  val mse = evaluator.evaluate(predictions)
+  println(s"Mean Squared Error (MSE) on test data = $mse")
 
-      val mse = evaluator.evaluate(predictions)
-      println(s"Mean Squared Error (MSE) on test data = $mse")
-      (name, fittedModel, mse)
-    }
-  }
-
-  val regressorsDf = regressorsResult.map {
-    case (name, model, mse) => (name, mse)
-  }.toSeq.toDF("model_type", "MSE")
-
-  regressorsDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us/congestion_models.df")
-
-  regressorsResult.foreach {
-    case (name, model, mse) => {
-      println(s"$name => MSE: $mse")
-      model.write.overwrite().save(s"s3a://yellowspark-us/congestion_model_$name.df")
-    }
-  }
+  fittedModel.write.overwrite().save(s"s3a://yellowspark-us-new/congestion_model_gradient_boost.df")
+  predictions.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/predictions_congestion.df")
 }

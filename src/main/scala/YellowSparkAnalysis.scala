@@ -45,11 +45,10 @@ object YellowSparkAnalysis extends App {
   }
 
 
-  def topDrivers(df: DataFrame, count: Int = 20): DataFrame = {
+  def topDrivers(df: DataFrame): DataFrame = {
     val groupByLicense = df.groupBy("hack_license").count()
     val avgByLicense = df.groupBy("hack_license").avg("average_speed_kmh")
       .withColumnRenamed("avg(average_speed_kmh)", "global_average_speed_kmh")
-
 
     val sumByLicense = df.groupBy("hack_license")
       .sum("passenger_count", "trip_distance_km", "taxi_revenue", "tip_amount", "fare_amount", "trip_time_in_secs")
@@ -64,6 +63,26 @@ object YellowSparkAnalysis extends App {
       .join(sumByLicense, "hack_license")
       .join(avgByLicense, "hack_license")
       .orderBy(desc("total_revenue"))
+  }
+
+  def topMedallions(df: DataFrame): DataFrame = {
+    val groupByLicense = df.groupBy("medallion").count()
+    val avgByLicense = df.groupBy("medallion").avg("average_speed_kmh")
+      .withColumnRenamed("avg(average_speed_kmh)", "global_average_speed_kmh")
+
+    val sumByLicense = df.groupBy("medallion")
+      .sum("passenger_count", "trip_distance_km", "taxi_revenue", "tip_amount", "fare_amount", "trip_time_in_secs")
+      .withColumnRenamed("sum(passenger_count)", "total_passengers")
+      .withColumnRenamed("sum(trip_distance_km)", "total_distance_km")
+      .withColumnRenamed("sum(taxi_revenue)", "total_revenue")
+      .withColumnRenamed("sum(tip_amount)", "total_tips")
+      .withColumnRenamed("sum(fare_amount)", "total_fares")
+      .withColumnRenamed("sum(trip_time_in_secs)", "total_duration")
+
+    groupByLicense
+      .join(sumByLicense, "medallion")
+      .join(avgByLicense, "medallion")
+      .orderBy(desc("total_distance_km"))
   }
 
   def sessionise(df: DataFrame): DataFrame = {
@@ -203,6 +222,10 @@ object YellowSparkAnalysis extends App {
   val topDriversDf = topDrivers(df)
   topDriversDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/topDrivers.df")
 
+  println("Doing topMedallionsDf...")
+  val topMedallionsDf = topMedallions(df)
+  topMedallionsDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/topMedallions.df")
+
   println("Doing daysDf...")
   val daysDf = statsByDayYear(df)
   daysDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/dayStats.df")
@@ -218,6 +241,7 @@ object YellowSparkAnalysis extends App {
   println("Doing hoursDf...")
   val hoursDf = statsByHour(df)
   hoursDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/hourStats.df")
+
   println("Doing distancesDf...")
   val distancesDf = distanceBinsStats(df)
   distancesDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/distStats.df")
