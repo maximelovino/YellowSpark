@@ -63,6 +63,8 @@ object YellowSparkAnalysis extends App {
       .join(sumByLicense, "hack_license")
       .join(avgByLicense, "hack_license")
       .orderBy(desc("total_revenue"))
+      .withColumn("time_efficiency", $"total_revenue" / $"total_duration")
+      .withColumn("distance_efficiency", $"total_revenue" / $"total_distance_km")
   }
 
   def topMedallions(df: DataFrame): DataFrame = {

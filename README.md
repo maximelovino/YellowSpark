@@ -6,6 +6,20 @@ YellowSpark is a project for a Big Data Analytics class at HES-SO Master. The pr
 
 We will also use boundaries for the NYC boroughs available [here](https://nycdatastables.s3.amazonaws.com/2013-08-19T18:15:35.172Z/nyc-borough-boundaries-polygon.geojson) as GeoJSON data.
 
+![](assets/heatmap.png)
+
+## Downloading the data
+
+You can download all the necessary data using `wget`.
+
+```sh
+wget https://nycdatastables.s3.amazonaws.com/2013-08-19T18:15:35.172Z/nyc-borough-boundaries-polygon.geojson
+wget https://archive.org/download/nycTaxiTripData2013/trip_data.7z
+wget https://archive.org/download/nycTaxiTripData2013/trip_fare.7z
+```
+
+Then you can extract the `.7z` files to get the 12 files contained in each of them.
+
 ## Dataset description
 
 The dataset consists of New York City taxi rides data from the year 2013. It is separated by month. For each month, two files are available: the `trip_data` and the `trip_fare`. The two files contains the exact same rides but not the same set of columns. There are duplicated columns between the files that will use to join them. An explanation of the story behind the retrieval of this dataset can be found [here](https://chriswhong.com/open-data/foil_nyc_taxi/).
@@ -85,7 +99,7 @@ We then uploaded the 24 files in a AWS S3 bucket in order to run the processing 
 
 We added some calculated features to our dataset as well. First of all, we don't like ["retard units"](https://en.wikipedia.org/wiki/Imperial_units) so we added a `trip_distance_km` column to have the distance converted to kilometers. Then, we added the `average_speed_kmh` computed from `trip_time_in_secs` and `trip_distance_km`. The speed will used for one of our analysis as well as for filtering out bad data.
 
-Then, we used the boroughs boundaries we had at our disposal and the pickup/dropoff longitude/latitude of the dataset to add `pickup_borough` and `dropoff_borough`. These two columns will also be used for filtering out bad data and one of our analysis.
+Then, we used the boroughs boundaries we had at our disposal and the pickup/dropoff longitude/latitude of the dataset to add `pickup_borough` and `dropoff_borough`. These two columns will also be used for filtering out bad data and one of our analysis. This is done using ESRI Geometry and is extracted from the project PDF.
 
 Finally, for the fares part, we added `taxi_revenue` which is the sum of the fare and the tip for a ride and as such it computes the amount that goes in the driver's pocket for the ride.
 
@@ -140,6 +154,8 @@ Finally, we used the `great_circle_distance_km` column we computed to remove all
 
 In the end, our full year dataset with the data cleaning applied contains 165'163'063 rides. The final cleaned dataset is saved as Parquet on S3 to be later used by our other programs (more on that later).
 
+We should actually spend even more time thinking about data cleaning, as there are a lot of strange rides in the dataset, but it would require a lot of time to filter out those rides as it needs manual oversight and research for these behaviors.
+
 ## Analysis questions
 
 ### Data analysis
@@ -158,20 +174,19 @@ In the plot below, we display the plot of the number of rides per rate code, we 
 
 ![](assets/rate_code_count_log.png)
 
-The data is the following:
+The number of rides is the following:
 
 | rate_code | count     |
 | --------- | --------- |
-| 0         | 25540     |
-| 1         | 162642242 |
-| 2         | 2886818   |
-| 3         | 20635     |
-| 4         | 72013     |
-| 6         | 1683      |
-| 7         | 28        |
-| 8         | 4         |
+| 0         | 25118     |
+| 1         | 162261262 |
+| 2         | 2798053   |
+| 3         | 9389      |
+| 4         | 68387     |
+| 6         | 654       |
+| 7         | 22        |
+| 8         | 2         |
 | 9         | 13        |
-| 10        | 1         |
 | 15        | 1         |
 | 17        | 1         |
 | 28        | 6         |
@@ -183,196 +198,126 @@ The data is the following:
 | 210       | 144       |
 | 221       | 1         |
 
-#### Boroughs analysis
+#### Boroughs analysis by pairs of boroughs
 
-We ran the analysis by the borough of the pickup, dropoff and then by the pickup-dropoff pairs of boroughs.
+##### Number of rides
 
-##### Pickup boroughs
+In the maps below, we can see the number of rides **for the whole year** between pairs of boroughs, we noticed that the majority of the rides are inside Manhattan, or eventually only departing from Manhattan (airports are outside Manhattan). Staten Island is the most remote borough and as such it contains the least amount of rides.
 
-##### Dropoff boroughs
+![](assets/maps1.png)
+![](assets/maps2.png)
+![](assets/maps3.png)
+![](assets/maps4.png)
+![](assets/maps5.png)
 
-##### Pairs of boroughs
+##### Average tip
+
+Above, we see that Staten Island has the least rides because it's really far from the rest, but they got the back of their drivers by providing the most tips on average to compensate for the long ride. This can also be a factor of the price of the ride. In general, trips starting in Bronx amount to the smallest average tips, this may be correlated to the the fact that people are in general poorer in the Bronx.
+
+![](assets/pairs_tips.png)
 
 ##### Wait times by last borough
+
+We sessionised the rides of every taxi driver in order to find the wait time between two rides. By computing the averages and displaying them, we can have an idea of where drivers should wait to find a new ride. We see that if you end in Manhattan, you will find a new ride in less that 10 minutes more or less. The worst borough to end in is Staten Island, as it will take more or less 50 minutes to find a new ride, because it will often involve going back to Manhattan before finding one.
+
+![](assets/borough_wait.png)
 
 #### Dates and time analysis
 
 ##### Number of rides
 
+By displaying the number of rides per day of year, we notice a repeating pattern, with an increase over perhaps a week and then it goes back then at the end of that. We can also see that we have way less rides in an area a bit after the middle of the year. We will dive into this with the next graphs.
+
+![](assets/year_rides_count.png)
+
+By looking at the number of rides per month, we see a reflection of the dip in rides, it is located in August. We see a general trend of taking less rides in the summer months.
+
+![](assets/months_rides_count.png)
+
+As far as the week trend we noticed earlier, it is reflected in the number of rides per week day, we see an increase in the number of rides on Friday and Saturday (6 and 7), so the trend is over a week but with weeks starting on Sunday.
+
+![](assets/day_rides_count.png)
+
+Finally, we can look at the number of rides by hour of the day. People tend to take a cab more in the evening to go out and "less" during the day, we can see that of course during the day it decrease but there are still more or less 2'000'000 rides taking place around 5am during the year. NYC is the city that never sleeps.
+
+![](assets/hour_rides_count.png)
+
 ##### Average tip amount
 
-##### Average revenue
+But hopefully the drivers for these 5am rides will be rewarded with generous tips? Well yes…at least people taking cabs during the night show their gratitude to the drivers.
 
-##### Average trip duration
-
-##### Average distance
+![](assets/hour_rides_tips.png)
 
 #### Top drivers
 
-We found 42750 unique drivers in the dataset (unique hack licenses).
+We found 42528 unique drivers in the dataset (unique hack licenses), in this section we will look at the evolution of the 100 best drivers in different metrics.
 
 ##### Most revenue
 
+We notice a slowing decrease in the revenue per driver in the top 100. The top driver in terms of revenue has accumulated 230'000 $ in one year.
+
 ![](assets/driver_total_revenue.png)
 
-| hack_license                     | total_revenue |
-| -------------------------------- | ------------- |
-| 1EDF99EE9DAC182027330EF48828B54A | 232833.64     |
-| D85749E8852FCC66A990E40605607B2F | 217306.57     |
-| 3AAB94CA53FE93A64811F65690654649 | 203246.73     |
-| 51C1BE97280A80EBFA8DAD34E1956CF6 | 198731.73     |
-| 23DF80C977D15141F11DD713C523C311 | 193650.41     |
-| 3D757E111C78F5CAC83D44A92885D490 | 191687.20     |
-| C4B62F0697BC53B9859CD87B151B6BB1 | 186191.71     |
-| 23F5E8FB4BC7E65E825E8484A596C45C | 180852.82     |
-| AFC75912D19C0CB0D48A34412F0E03ED | 179400.75     |
-| 03173DD93C1171DA1788E6E7D733C5A9 | 178889.01     |
-| 6DC841A5F028073A75BD0F570AB57035 | 177695.73     |
-| C4E07B8C06FAB8E540BECE2DDCDFE6BA | 175640.29     |
-| CE625FD96D0FAFC812A6957139B354A1 | 170847.82     |
-| 65A7C84B428B0CCC2B71630FD333AC8D | 169315.45     |
-| 3251A220F065378A4E35BE26E611DA8D | 167144.60     |
-| C779D022381EA6EFE908F6359D917FEF | 166976.32     |
-| 9D1B49F1300FE00670C5052C008D2112 | 166937.46     |
-| E66E58207128619CFF2D2E2C3C7ECC08 | 164550.29     |
-| 7716123C59E6C0D69E76A14B79F338C1 | 161080.20     |
-| 7913172189931A1A1632562B10AB53C4 | 160795.84     |
-
-##### Most tips
-
-![](assets/driver_total_tips.png)
-
-| hack_license                     | total_tips |
-| -------------------------------- | ---------- |
-| D85749E8852FCC66A990E40605607B2F | 20951.57   |
-| 51C1BE97280A80EBFA8DAD34E1956CF6 | 20562.23   |
-| 3AAB94CA53FE93A64811F65690654649 | 20341.73   |
-| AFC75912D19C0CB0D48A34412F0E03ED | 19090.75   |
-| 23DF80C977D15141F11DD713C523C311 | 18408.41   |
-| 23F5E8FB4BC7E65E825E8484A596C45C | 17963.82   |
-| C4E07B8C06FAB8E540BECE2DDCDFE6BA | 17950.29   |
-| C4B62F0697BC53B9859CD87B151B6BB1 | 17876.11   |
-| 3D757E111C78F5CAC83D44A92885D490 | 17715.70   |
-| 65A7C84B428B0CCC2B71630FD333AC8D | 17489.97   |
-| 6DC841A5F028073A75BD0F570AB57035 | 16947.73   |
-| 3251A220F065378A4E35BE26E611DA8D | 16692.10   |
-| CE625FD96D0FAFC812A6957139B354A1 | 16171.82   |
-| 9D1B49F1300FE00670C5052C008D2112 | 16126.96   |
-| 7716123C59E6C0D69E76A14B79F338C1 | 16002.70   |
-| 92E10581A1EF357443217961F5E31A4C | 15990.62   |
-| CDE0E71B18BC61B71E8AAC1D04D0E142 | 15900.56   |
-| 6C2FF19A115CC50926F2A6CFC9494A90 | 15849.58   |
-| 7913172189931A1A1632562B10AB53C4 | 15808.84   |
-| C779D022381EA6EFE908F6359D917FEF | 15693.82   |
-
 ##### Most distance
+
+We notice a less slowing decrease in the distance per drivers in the top 100. The top driver in terms of distance has driven for 77'000 km in one year.
 
 ![](assets/driver_total_distance.png)
 
-| hack_license                     | total_distance_km |
-| -------------------------------- | ----------------- |
-| D85749E8852FCC66A990E40605607B2F | 76392.102840      |
-| 3AAB94CA53FE93A64811F65690654649 | 69162.834906      |
-| 8C1D318CCC75B91ACBFC789715922449 | 67259.307554      |
-| 51C1BE97280A80EBFA8DAD34E1956CF6 | 65834.848533      |
-| AFC75912D19C0CB0D48A34412F0E03ED | 65127.897658      |
-| 23DF80C977D15141F11DD713C523C311 | 62359.832858      |
-| 23F5E8FB4BC7E65E825E8484A596C45C | 62332.055650      |
-| 6C2FF19A115CC50926F2A6CFC9494A90 | 62319.534984      |
-| 6DC841A5F028073A75BD0F570AB57035 | 62190.787784      |
-| C4B62F0697BC53B9859CD87B151B6BB1 | 62084.474784      |
-| 970978A9CF1C59F8DC462176E305EFCD | 62042.519290      |
-| 3251A220F065378A4E35BE26E611DA8D | 61513.464859      |
-| 3D757E111C78F5CAC83D44A92885D490 | 61237.961944      |
-| 5114DF85775775ED4F53235D8478E80B | 60927.954780      |
-| 9D1B49F1300FE00670C5052C008D2112 | 60924.092364      |
-| C4E07B8C06FAB8E540BECE2DDCDFE6BA | 59159.499334      |
-| C779D022381EA6EFE908F6359D917FEF | 58413.248376      |
-| 5305DE3681B59EC2CD720C3DD8CBFFBC | 57366.469266      |
-| E66E58207128619CFF2D2E2C3C7ECC08 | 56977.234294      |
-| 1E94B13BB698BC3C98178429C45FDEED | 56808.253594      |
-
-##### Most rides
-
-![](assets/driver_total_count.png)
-
-| hack_license                     | count |
-| -------------------------------- | ----- |
-| 51C1BE97280A80EBFA8DAD34E1956CF6 | 17119 |
-| D85749E8852FCC66A990E40605607B2F | 16454 |
-| 3D757E111C78F5CAC83D44A92885D490 | 15950 |
-| 23DF80C977D15141F11DD713C523C311 | 15946 |
-| 03173DD93C1171DA1788E6E7D733C5A9 | 15720 |
-| 3AAB94CA53FE93A64811F65690654649 | 15033 |
-| CE625FD96D0FAFC812A6957139B354A1 | 14298 |
-| 23F5E8FB4BC7E65E825E8484A596C45C | 13953 |
-| C4B62F0697BC53B9859CD87B151B6BB1 | 13859 |
-| BAC38C9133317547DF328ABDEEF8B7D5 | 13781 |
-| 65A7C84B428B0CCC2B71630FD333AC8D | 13575 |
-| 9E035DBF346FDE01FE87FAB470276DA6 | 13314 |
-| C4E07B8C06FAB8E540BECE2DDCDFE6BA | 13309 |
-| 6DC841A5F028073A75BD0F570AB57035 | 13259 |
-| E66E58207128619CFF2D2E2C3C7ECC08 | 13162 |
-| 1802778DABBD7646096178ECC690AF1A | 13125 |
-| 9D1B49F1300FE00670C5052C008D2112 | 12991 |
-| 7913172189931A1A1632562B10AB53C4 | 12837 |
-| 3578782ABD6492CEB927B2A8EBCF1402 | 12745 |
-| 6B38951F9D76FA1C201EDAD717050CF7 | 12704 |
-
 ##### Most trip duration
+
+Here, the top driver in terms of time spent on rides has spent the equivalent of 136 days on rides, that is 9 hours per day on rides on average.
 
 ![](assets/driver_total_duration.png)
 
-| hack_license                     | total_duration |
-| -------------------------------- | -------------- |
-| 624F08173354FF95805B7B6C9318186D | 127661229      |
-| 255243D75757CA69E2270A525DABEFDB | 107419820      |
-| 6CEE2CD9DCF76C53512579DF719D2B57 | 92906387       |
-| F426171D9725BF58B391BA8BEC3919F0 | 86008631       |
-| EA52BEEB093A7B711A366ECF525D621A | 72746400       |
-| A33DB5A909ADBFCE2AB057264141C8E9 | 61314328       |
-| 8DE35D615C7F0AE944C288BB13479AE5 | 60226484       |
-| BA4527CF0724B3C024C9132265B6D07B | 60105814       |
-| C82BB3EA982A6865F938C0D1CD617C45 | 59120500       |
-| BEC578DC2483869BA7166498CF14A6B7 | 57997689       |
-| D605BB43ABD8208CB08D0E36BDFD393E | 55939541       |
-| 4A3B64EFD0FE0508C9DD537CF527771E | 55417935       |
-| 9199D1A612020B20CFE1F6DA7C70021A | 54025498       |
-| 2BC91399E0D73A883FA6869740EC633D | 53864653       |
-| 51A03E200C82F7CA6A7273D7686103F5 | 53735470       |
-| D3B2DEC5DB78D91D9AFADA53B3B521B5 | 52921779       |
-| 0420EC44A00B1764DADD034981FC24D3 | 51048364       |
-| 6E15DFCAF6B5C3FE041D97BBF4587742 | 50205294       |
-| ED0014C5C4E7EA18A5F92F5C2359E1CD | 50086096       |
-| DB646BA4F0DFB060FAF3879A33EAE3FB | 49287599       |
+##### Most time efficiency
 
-#### Top medallions (taxi cars)
+Now, when looking at time efficiency we can find some strange things. The top driver here is making more or less 2.50 $ **PER SECOND** spent on rides. That's a nice job but how is that even possible? He may only paid to wait on very expensive rate codes.
 
-##### Most distance
+![](assets/driver_time_efficiency.png)
 
-##### Most rides
+##### Most distance efficiency
 
-##### Most passengers
+Same thing here, the most efficient driver in terms of distance is making 250 $ **PER KM**. Again, he may be on special rate codes?
 
-##### Most trip duration
+![](assets/driver_distance_efficiency.png)
 
 #### Distances analysis
 
-#### Speeds analysis
+Finally, we look at the number of rides for each distance value, on the x axis we have the floor of the kilometer distance for the ride. The y axis uses a logarithmic scale, we see a steady logaritmic decrease more or less in the number of rides as the distance increases. Rides above 100 km may be bad data that we should filter but we can't say for sure.
 
-#### Costs analysis
+![](assets/distance_rides_log.png)
 
 ### Machine Learning
 
 #### Linear regression model for fare calculation
 
+We trained a linear regression for the 4 main rate codes in order to estimate the formula used to compute fares. To do this, we took the full dataset, filtered for the rate code and then split into training and test sets. The features we used to train were the distance and the duration of the trip and we wanted to predict the fare amount.
+
+We can see that for rate codes 1 and 2 we have respectable Mean Squared Errors values. In the case of rate code, this means that we can predict the cost with +/- 1.30 \$. For rate code 2, currently, it is a fixed rate of 52 \$. We can notice a similarity with the 50.818 we found as the base fare.
+
+| Rate Code | MSE (Mean Squared Error) | Formula                                  |
+| --------- | ------------------------ | ---------------------------------------- |
+| 1         | 1.804926                 | 0.006 * seconds  + 1.201   * km + 2.095  |
+| 2         | 4.070359                 | 0.000 * seconds  + 0.039   * km + 50.818 |
+| 3         | 56.277111                | 0.003 * seconds  + 1.371   * km + 20.203 |
+| 4         | 16.970909                | 0.004 * seconds  + 1.642   * km + 2.047  |
+
+We can look at the plots for rate code 2 to see that it matches well:
+
+![](assets/rate_2_linear_model.png)
+
+And for rate code 3 to see that it matches well:
+
+![](assets/rate_3_linear_model.png)
+
 #### Regression model for trip duration prediction
 
-## Algorithms
+##### Feature extraction
 
-#### Borough detection UDF
+![](assets/hour_week_standard.png)
 
-#### Feature extraction for training trip duration model
+![](assets/hour_week_sinus.png)
 
 ## Optimisations
 
