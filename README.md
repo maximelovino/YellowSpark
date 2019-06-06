@@ -303,29 +303,54 @@ We can see that for rate codes 1 and 2 we have respectable Mean Squared Errors v
 | 3         | 56.277111                | 0.003 * seconds  + 1.371   * km + 20.203 |
 | 4         | 16.970909                | 0.004 * seconds  + 1.642   * km + 2.047  |
 
-We can look at the plots for rate code 2 to see that it matches well:
+For rate code 1, even though we have the best MSE, we notice on the plot that we have a lot of difference for certain rides, most of the rides are grouped at the bottom left, and the rides with big difference are actually very strange rides and perhaps should be filtered, we should remove any data deviating from the norm as the rate code normally has a fixed fare formula:
+
+![](assets/rate_1_linear_model.png)
+
+We can look at the plots for rate code 2 to see that it matches well here:
 
 ![](assets/rate_2_linear_model.png)
 
-And for rate code 3 to see that it matches well:
+And for rate code 3 to see that it matches well again:
 
 ![](assets/rate_3_linear_model.png)
 
 #### Regression model for trip duration prediction
 
+We also trained a model to estimate traffic congestion, the goal here is to estimate the duration of a trip before it happens. We decided to train this model only for Manhattan and only for rate codes 1 rides.
+
+The features used are:
+
+- The pickup date time as hour of the week (sinus and cosinus, see below)
+- The pickup coordinates
+- The dropoff coordinates (destination requested by the user)
+- The distance (could be estimated by the taxi driver using Google Maps for example)
+
+We built a [Gradient Boost Regression](https://spark.apache.org/docs/latest/ml-classification-regression.html#gradient-boosted-tree-regression) model for this as noticed that it was the best model in practice. In the end (after 5 hours of training on 16 cores), we had an estimation accurate to +/- 4 minutes for the trip duration. This is not enough to be useful in our opinion but the [trip duration estimation problem is a very interesting problem](https://www.kaggle.com/c/nyc-taxi-trip-duration/overview) and we should take more time on it if we want to solve it.
+
 ##### Feature extraction
+
+We extracted the hour of the week as a feature, so that we have hours from midnight on Sunday (hour 0) to the next Saturday at 11pm (hour 168). This allows to have a proximity in the data when stepping over the midnight mark each day. We wanted to use weekly traffic patterns so we limited it to 1 week.
+
+The problem is the drop at the end of the week to go back to 0 for the start of next week, but the hours are still close to them in practice and we lose this proximity here.
 
 ![](assets/hour_week_standard.png)
 
+In order to combat this, we computed the sinus and cosinus with the following formulas:
+
+```scala
+df
+.withColumn("sin_pickup_hour_week", sin((lit(2 * Math.PI) * $"pickup_week_hour") / pickupMaxHour))
+.withColumn("cos_pickup_hour_week", cos((lit(2 * Math.PI) * $"pickup_week_hour") / pickupMaxHour))
+```
+
+While we could one or the other to get a continuous signal, we need the combination of the two otherwise we have repetitions of the same values for two different hours if we take only one of the two.
+
 ![](assets/hour_week_sinus.png)
 
-## Optimisations
+## Optimisations with Parquet
 
 TODO talk about using Parquet
-
-## Testing and evaluation
-
-TODO talk about train test split
 
 ## Future improvements
 
