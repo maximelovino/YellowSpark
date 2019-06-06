@@ -20,6 +20,6 @@ object TaxiReadingParquet {
     val finalDf = TaxiReader.parseTaxiData(spark, boroughs)
 
     finalDf.printSchema()
-    finalDf.write.parquet("s3a://yellowspark-us-new/rides.df")
+    finalDf.write.parquet("s3a://yellowspark-us-new/rides_final.df")
   }
 }

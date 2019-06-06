@@ -18,7 +18,7 @@ object YellowSparkRegression extends App {
 
   import spark.implicits._
 
-  val df = spark.read.parquet("s3a://yellowspark-us-new/rides.df")
+  val df = spark.read.parquet("s3a://yellowspark-us-new/rides_final.df")
   df.printSchema()
 
   val preparedDF = df

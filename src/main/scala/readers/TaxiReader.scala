@@ -109,6 +109,8 @@ object TaxiReader {
         .where(s"(rate_code = 1 AND great_circle_distance_km < (trip_distance_km + $GPS_MARGIN)) OR rate_code <>1")
         .where("passenger_count > 0")
         .filter("fare_amount > 0")
+        .filter("trip_time_in_secs < (24*60*60)")
+        .filter("average_speed_kmh > 1")
 
       finalDf.cache()
       finalDf

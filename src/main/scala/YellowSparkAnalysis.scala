@@ -195,7 +195,7 @@ object YellowSparkAnalysis extends App {
   }
 
 
-  val df = spark.read.parquet("s3a://yellowspark-us-new/rides.df")
+  val df = spark.read.parquet("s3a://yellowspark-us-new/rides_final.df")
 
   df.printSchema()
 

@@ -21,9 +21,9 @@ object YellowSparkCongestion extends App {
 
   import spark.implicits._
 
-  val df = spark.read.parquet("s3a://yellowspark-us-new/rides.df")
+  val df = spark.read.parquet("s3a://yellowspark-us-new/rides_final.df")
     .where("rate_code = 1")
-    .where("average_speed_kmh >= 1 and average_speed_kmh < 70")
+    .where("average_speed_kmh < 70")
     .select("pickup_datetime", "dropoff_datetime", "trip_time_in_secs", "trip_distance_km", "average_speed_kmh", "pickup_borough", "dropoff_borough", "pickup_latitude", "pickup_longitude", "dropoff_latitude", "dropoff_longitude")
     .withColumn("month", month($"pickup_datetime"))
     .withColumn("pickup_weekday", dayofweek($"pickup_datetime"))

@@ -134,9 +134,11 @@ There were also some failed coordinates for rides and we decided to remove them 
 
 We also removed any rides with 0 passengers and rides with `fare_amount <= 0` because they make no sense.
 
+We noticed that there were rides taking more than 1 day to complete (more than you would think) and also rides where the car was just waiting for almost all day thus having a very low average speed. We decided to remove rides with a speed below 1 km/h and rides taking more than 24 hours to complete.
+
 Finally, we used the `great_circle_distance_km` column we computed to remove all rate code #01 rides (most of the rides have rate code #01 and our trafic congestion model uses only those rides) to remove any  ride that had a distance smaller than the `great_circle_distance_km` with a margin of 0.5 km.
 
-In the end, our full year dataset with the data cleaning applied contains 165'649'140 rides. The final cleaned dataset is saved as Parquet on S3 to be later used by our other programs (more on that later).
+In the end, our full year dataset with the data cleaning applied contains 165'163'063 rides. The final cleaned dataset is saved as Parquet on S3 to be later used by our other programs (more on that later).
 
 ## Analysis questions
 
