@@ -1,6 +1,6 @@
 package readers
-
 import com.esri.core.geometry.Point
+import config.Constants
 import geo.Feature
 import geo.GeoJsonProtocol._
 import org.apache.spark.sql.functions.{to_timestamp, udf}
@@ -61,8 +61,8 @@ object TaxiReader {
     val milesConversionUdf = udf(milesConversion)
 
 
-    val rawTripsDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us-new/trip_data_*.csv")
-    val rawFaresDf = spark.read.format("csv").option("header", "true").load("s3a://yellowspark-us-new/trip_fare_*.csv")
+    val rawTripsDf = spark.read.format("csv").option("header", "true").load(s"${Constants.rootFolderScheme}/trip_data_*.csv")
+    val rawFaresDf = spark.read.format("csv").option("header", "true").load(s"${Constants.rootFolderScheme}/trip_fare_*.csv")
 
 
     val cleanedUpDf = trimmedDataFrame(rawFaresDf) // The fares CSV contains spaces in headers so we have to trim the column names

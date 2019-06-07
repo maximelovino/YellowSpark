@@ -1,3 +1,4 @@
+import config.Constants
 import org.apache.spark.sql.SparkSession
 import readers.{GeoReader, TaxiReader}
 
@@ -20,6 +21,6 @@ object TaxiReadingParquet {
     val finalDf = TaxiReader.parseTaxiData(spark, boroughs)
 
     finalDf.printSchema()
-    finalDf.write.parquet("s3a://yellowspark-us-new/rides_final.df")
+    finalDf.write.parquet(s"${Constants.rootFolderScheme}/rides_final.df")
   }
 }

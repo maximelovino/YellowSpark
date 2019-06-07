@@ -1,3 +1,4 @@
+import config.Constants
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.ml.feature._
@@ -21,7 +22,7 @@ object YellowSparkCongestion extends App {
 
   import spark.implicits._
 
-  val df = spark.read.parquet("s3a://yellowspark-us-new/rides_final.df")
+  val df = spark.read.parquet(s"${Constants.rootFolderScheme}/rides_final.df")
     .where("rate_code = 1")
     .where("average_speed_kmh < 70")
     .select("pickup_datetime", "dropoff_datetime", "trip_time_in_secs", "trip_distance_km", "average_speed_kmh", "pickup_borough", "dropoff_borough", "pickup_latitude", "pickup_longitude", "dropoff_latitude", "dropoff_longitude")
@@ -70,6 +71,6 @@ object YellowSparkCongestion extends App {
   val mse = evaluator.evaluate(predictions)
   println(s"Mean Squared Error (MSE) on test data = $mse")
 
-  fittedModel.write.overwrite().save(s"s3a://yellowspark-us-new/congestion_model_gradient_boost.df")
-  predictions.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/predictions_congestion.df")
+  fittedModel.write.overwrite().save(s"${Constants.rootFolderScheme}/congestion_model_gradient_boost.df")
+  predictions.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/predictions_congestion.df")
 }

@@ -1,5 +1,6 @@
 import java.sql.Timestamp
 
+import config.Constants
 import org.apache.spark.sql.functions.{avg, desc, stddev, _}
 import org.apache.spark.sql.{DataFrame, Row, SaveMode, SparkSession}
 
@@ -197,74 +198,74 @@ object YellowSparkAnalysis extends App {
   }
 
 
-  val df = spark.read.parquet("s3a://yellowspark-us-new/rides_final.df")
+  val df = spark.read.parquet(s"${Constants.rootFolderScheme}/rides_final.df")
 
   df.printSchema()
 
   println(s"Number of rides total: ${df.count()}")
 
   val rateCodeStats = statsByRateCode(df)
-  rateCodeStats.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/rateCodes.df")
+  rateCodeStats.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/rateCodes.df")
   rateCodeStats.show()
 
 
   println("Doing pickupStats...")
   val pickupStats = statsByPickupBorough(df)
-  pickupStats.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/pickups.df")
+  pickupStats.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/pickups.df")
 
   println("Doing dropoffStats...")
   val dropoffStats = statsByDropoffBorough(df)
-  dropoffStats.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/dropoffs.df")
+  dropoffStats.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/dropoffs.df")
 
   println("Doing boroughPairs...")
   val boroughPairs = statsByBoroughPairs(df)
-  boroughPairs.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/boroughPairs.df")
+  boroughPairs.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/boroughPairs.df")
 
   println("Doing topDriversDf...")
   val topDriversDf = topDrivers(df)
-  topDriversDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/topDrivers.df")
+  topDriversDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/topDrivers.df")
 
   println("Doing topMedallionsDf...")
   val topMedallionsDf = topMedallions(df)
-  topMedallionsDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/topMedallions.df")
+  topMedallionsDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/topMedallions.df")
 
   println("Doing daysDf...")
   val daysDf = statsByDayYear(df)
-  daysDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/dayStats.df")
+  daysDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/dayStats.df")
 
   println("Doing daysWeekDf...")
   val daysWeekDf = statsByDayWeek(df)
-  daysWeekDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/dayWeekStats.df")
+  daysWeekDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/dayWeekStats.df")
 
   println("Doing monthsDf...")
   val monthsDf = statsByMonth(df)
-  monthsDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/monthStats.df")
+  monthsDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/monthStats.df")
 
   println("Doing hoursDf...")
   val hoursDf = statsByHour(df)
-  hoursDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/hourStats.df")
+  hoursDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/hourStats.df")
 
   println("Doing distancesDf...")
   val distancesDf = distanceBinsStats(df)
-  distancesDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/distStats.df")
+  distancesDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/distStats.df")
 
   println("Doing speedsDf...")
   val speedsDf = speedBinsStats(df)
-  speedsDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/speedStats.df")
+  speedsDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/speedStats.df")
 
   println("Doing durationsDf...")
   val durationsDf = durationBinsStats(df)
-  durationsDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/durationStats.df")
+  durationsDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/durationStats.df")
 
   println("Doing revenueDf...")
   val revenueDf = revenueBinStats(df)
-  revenueDf.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/revenueStats.df")
+  revenueDf.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/revenueStats.df")
 
   println("Doing sessions...")
   val sessions = sessionise(df)
 
   println("Doing waitTimes...")
   val waitTimes = waitTimesByBorough(sessions)
-  waitTimes.write.mode(SaveMode.Overwrite).parquet("s3a://yellowspark-us-new/waitTimes.df")
+  waitTimes.write.mode(SaveMode.Overwrite).parquet(s"${Constants.rootFolderScheme}/waitTimes.df")
 
 }

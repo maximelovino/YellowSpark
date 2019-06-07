@@ -292,7 +292,7 @@ Finally, we look at the number of rides for each distance value, on the x axis w
 
 #### Linear regression model for fare calculation
 
-We trained a linear regression for the 4 main rate codes in order to estimate the formula used to compute fares. To do this, we took the full dataset, filtered for the rate code and then split into training and test sets. The features we used to train were the distance and the duration of the trip and we wanted to predict the fare amount.
+We trained a linear regression for the 4 main rate codes in order to estimate the formula used to compute fares. This implementation is contained in the `YellowSparkRegression` main. To do this, we took the full dataset, filtered for the rate code and then split into training and test sets. The features we used to train were the distance and the duration of the trip and we wanted to predict the fare amount.
 
 We can see that for rate codes 1 and 2 we have respectable Mean Squared Errors values. In the case of rate code, this means that we can predict the cost with +/- 1.30 \$. For rate code 2, currently, it is a fixed rate of 52 \$. We can notice a similarity with the 50.818 we found as the base fare.
 
@@ -317,7 +317,7 @@ And for rate code 3 to see that it matches well again:
 
 #### Regression model for trip duration prediction
 
-We also trained a model to estimate traffic congestion, the goal here is to estimate the duration of a trip before it happens. We decided to train this model only for Manhattan and only for rate codes 1 rides.
+We also trained a model to estimate traffic congestion, the goal here is to estimate the duration of a trip before it happens. This implementation is contained in the `YellowSparkCongestion` main. We decided to train this model only for Manhattan and only for rate codes 1 rides.
 
 The features used are:
 
@@ -350,8 +350,22 @@ While we could one or the other to get a continuous signal, we need the combinat
 
 ## Optimisations with Parquet
 
-TODO talk about using Parquet
+The biggest optimisations we've made to the project revolve around the use of Parquet files to store our cleaned dataset and the results of the different parts of the project.
+
+By reading the cleaned dataset from a Parquet file, we save a lot of file size because of the fact that the columns are typed in Parquet and the file is binary. We go from more or less 50GB to 9GB for the Parquet file. Moreover, we don't need to apply the filters again, and more importantly the join between the two sets of files. Also, due to the nature of the format, it is also faster to select column or even count rows in the dataset.
+
+Then, for the analysis, we decided to save everything to Parquet again, so that we let the analysis run on the cluster and then once it is done, we can just open the completed analysis in Parquet from PySpark for example and we just need to read the files and visualisae the data. Note that we still need to reorder the data when opening Parquet files if order is important because Parquet doesn't store the order of the rows in its partitions.
+
+Finally, for the two machine learning models, we saved statistics for the models in Parquet files and the models were saved on S3 with the saving feature built into MLLib, apparently using Parquet at least in part.
+
+We noticed a few problems when writing Parquet files to S3, with rarely a 404 error message from S3 and the AWS SDK in Spark when writing the fail, this led to some bad Parquet files that we needed to rewrite after.
 
 ## Future improvements
 
-TODO talk about better models and data for traffic prediction, multiyear data as well
+We could continue working on this project for months due to the richness of the data provided but we would need to improve a few things.
+
+First of all, we need to spend way more time analysing and cleaning the data to remove some real, but odd, behaviors in taxi riderships that leads us to have datasets not suitable for predicting taxi trip duration. Some rides involve almost no distance for a long duration, because the taxi is just waiting with the meter running, we should identify those rides and separate into their own datasets. We could use clustering models to group together the different kind of rides and then train specific models for each of them.
+
+It would also be interesting to have data from multiple years in order to use yearly patterns to train the models, we could also train models to visualise the change of fare calculations from year to year. This data is available, we didn't integrate it for this project because it would have taken too much computing time to analyse multiple years together.
+
+Also, we haven't done a lot of visualisations for this project, except for the heatmap at the top of this document, but there are a lot of interesting visualisations that could be done, for example visualisations related to the average speed during the week in the different areas.
