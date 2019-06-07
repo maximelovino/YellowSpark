@@ -344,7 +344,7 @@ df
 .withColumn("cos_pickup_hour_week", cos((lit(2 * Math.PI) * $"pickup_week_hour") / pickupMaxHour))
 ```
 
-While we could one or the other to get a continuous signal, we need the combination of the two otherwise we have repetitions of the same values for two different hours if we take only one of the two.
+While we could one or the other to get a continuous signal, we need the combination of the two otherwise we have repetitions of the same values for two different hours if we take only one of the two. This encoding of cyclical feature was inspired by [this kaggle kernel](https://www.kaggle.com/avanwyk/encoding-cyclical-features-for-deep-learning)
 
 ![](assets/hour_week_sinus.png)
 
